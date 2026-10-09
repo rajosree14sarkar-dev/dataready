@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DataReady: is your data safe to build on?</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root{--bg:#f4f8f8;--card:#fff;--ink:#0b3c49;--txt:#1f2d33;--muted:#5b6b72;--line:#d2e1e1;--teal:#1b7f79;--amber:#c97f10;--red:#c0392b;--pale:#e3f1f0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1b20;--card:#14282f;--ink:#e8f4f3;--txt:#d5e3e3;--muted:#90a8ab;--line:#24404a;--teal:#4fc3bb;--amber:#f2a541;--red:#ff7b6b;--pale:#173a40}}
+:root[data-theme="dark"]{--bg:#0d1b20;--card:#14282f;--ink:#e8f4f3;--txt:#d5e3e3;--muted:#90a8ab;--line:#24404a;--teal:#4fc3bb;--amber:#f2a541;--red:#ff7b6b;--pale:#173a40}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 16px 48px}
+h1{font:700 28px/1.15 Georgia,"Times New Roman",serif;color:var(--ink);margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+button{font:600 15px system-ui,sans-serif;border:0;border-radius:10px;padding:12px 14px;cursor:pointer;background:var(--teal);color:#fff}
+button.alt{background:var(--pale);color:var(--ink)}
+button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg);color:var(--txt);font:13px ui-monospace,Menlo,monospace}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:18px;text-align:center;color:var(--muted);margin-bottom:10px}
+.score{display:flex;align-items:center;gap:16px}
+.num{font:700 52px/1 Georgia,serif}
+.bar{height:10px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;transition:width .4s}
+.issue{padding:10px 0;border-top:1px solid var(--line);display:flex;gap:10px}
+.issue:first-child{border-top:0}
+.chip{font:700 11px sans-serif;border-radius:6px;padding:3px 7px;height:fit-content;color:#fff;text-transform:uppercase}
+.high{background:var(--red)}.med{background:var(--amber)}.ok{background:var(--teal)}
+.issue b{color:var(--ink)}.issue small{display:block;color:var(--muted)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;font-size:13px;white-space:nowrap}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+th{background:var(--pale);color:var(--ink)}
+h2{font:700 15px sans-serif;color:var(--ink);margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em}
+.muted{color:var(--muted);font-size:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>DataReady</h1>
+<p class="sub">Know if your data is safe to build on, before you spend hours on it. Runs in your browser; nothing is uploaded.</p>
+
+<section class="card" id="inCard">
+  <h2>1. Add your data</h2>
+  <div class="drop">Choose a CSV file or paste data below</div>
+  <div class="row" style="margin-bottom:10px">
+    <button class="alt" id="pick">Choose CSV</button>
+    <button class="alt" id="sample">Try messy sample</button>
+    <input type="file" id="file" accept=".csv,text/csv,text/plain" hidden>
+  </div>
+  <textarea id="paste" placeholder="Or paste CSV text here"></textarea>
+  <div class="row" style="margin-top:10px"><button id="check">Check my data</button></div>
+  <p class="muted" id="err" style="color:var(--red)"></p>
+</section>
+
+<section id="out" hidden>
+  <div class="card">
+    <h2>2. Readiness report</h2>
+    <div class="score"><div class="num" id="sc">0</div>
+      <div style="flex:1"><div id="verdict" style="font-weight:700;color:var(--ink)"></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="muted" id="meta" style="margin-top:6px"></div></div></div>
+    <div id="hist" class="muted" style="margin-top:8px"></div>
+  </div>
+  <div class="card"><h2>What I found</h2><div id="issues"></div></div>
+  <div class="card">
+    <h2>3. Fix in one tap</h2>
+    <div class="row">
+      <button class="alt" data-fix="trim" id="f-trim"></button>
+      <button class="alt" data-fix="miss" id="f-miss"></button>
+      <button class="alt" data-fix="var" id="f-var"></button>
+      <button class="alt" data-fix="dup" id="f-dup"></button>
+    </div>
+    <div class="row" style="margin-top:10px"><button data-fix="all" id="f-all">Fix everything</button></div>
+  </div>
+  <div class="card">
+    <h2>4. Take it with you</h2>
+    <div class="row"><button id="dl">Download cleaned CSV</button><button class="alt" id="reset">Start over</button></div>
+    <textarea id="csvOut" hidden readonly style="margin-top:10px"></textarea>
+    <p class="muted" id="dlmsg"></p>
+  </div>
+  <div class="card"><h2>Preview (first 6 rows)</h2><div class="tw" id="prev"></div></div>
+</section>
+</main>
+<script>
+const SAMPLE=`district,state,population,vaccinated_pct,report_date
+Pune,Maharashtra,"3,124,000",78,2024-01-05
+pune ,Maharashtra,3124000,78,2024-01-05
+PUNE,maharashtra,N/A,81,2024-01-06
+Nashik,Maharashtra,1486000,64,2024-01-05
+Nashik,Maharashtra,1486000,64,2024-01-05
+Nagpur,Maharashtra,about 2500000,,2024-01-06
+Nagpur,Maharashtra,2500000,59,2024-01-06
+Jaipur,Rajasthan,3046000,71,2024-01-06
+Jaipur,rajasthan,-,--,2024-01-07
+Kota,Rajasthan,1001694,66,2024-01-07
+Kota ,Rajasthan,1001694,66,2024-01-07
+Udaipur,Rajasthan,null,54,2024-01-08
+Ajmer,Rajasthan,~5 lakh,,2024-01-08`;
+const MISS=new Set(['','na','n/a','null','none','nan','-','--','?','unknown']);
+const isMiss=v=>MISS.has(String(v).trim().toLowerCase());
+const isNum=v=>String(v).trim()!==''&&!isNaN(Number(String(v).replace(/,/g,'')));
+const $=id=>document.getElementById(id);
+let H=[],D=[],start=null;
+
+function load(text){
+  $('err').textContent='';
+  const r=Papa.parse(text.trim(),{skipEmptyLines:'greedy'});
+  const rows=r.data;
+  if(rows.length<2){$('err').textContent='I need a header row and at least one data row.';return}
+  H=rows[0].map(String);
+  D=rows.slice(1,50001).map(x=>{const a=x.slice(0,H.length).map(String);while(a.length<H.length)a.push('');return a});
+  start=null;$('hist').textContent='';
+  $('out').hidden=false;render();
+  $('out').scrollIntoView({behavior:'smooth'});
+}
+function varGroups(){
+  const out=[];
+  H.forEach((h,j)=>{
+    const vals=D.map(r=>r[j].trim()).filter(v=>!isMiss(v));
+    if(!vals.length||vals.filter(isNum).length/vals.length>.5)return;
+    if(new Set(vals).size>Math.max(50,vals.length*.5))return;
+    const g={};
+    vals.forEach(v=>{const k=v.toLowerCase().replace(/[^a-z0-9]/g,'');g[k]=g[k]||{};g[k][v]=(g[k][v]||0)+1});
+    Object.values(g).forEach(m=>{if(Object.keys(m).length>1)out.push({j,m})});
+  });
+  return out;
+}
+function analyze(){
+  const n=D.length,cols=H.length,I=[];let pen=0;
+  const hp=H.filter(h=>!h.trim()).length+(H.length-new Set(H.map(h=>h.trim().toLowerCase())).size);
+  if(hp){I.push(['high','Header problems',hp+' empty or duplicate column names']);pen+=10}
+  const miss=H.map((h,j)=>D.filter(r=>isMiss(r[j])).length);
+  const tm=miss.reduce((a,b)=>a+b,0);
+  if(tm){
+    const top=H.map((h,j)=>[h,miss[j]]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]+' ('+Math.round(x[1]/n*100)+'%)').join(', ');
+    I.push([tm/(n*cols)>.08?'high':'med',tm+' missing values','Most in: '+top]);pen+=Math.min(30,tm/(n*cols)*150);
+  }
+  const seen=new Set();let dup=0;
+  D.forEach(r=>{const k=JSON.stringify(r.map(v=>v.trim()));seen.has(k)?dup++:seen.add(k)});
+  if(dup){I.push(['high',dup+' duplicate rows','Exact repeats (ignoring spaces) that can skew counts']);pen+=Math.min(15,dup/n*60)}
+  let ws=0;D.forEach(r=>r.forEach(v=>{if(v!==v.trim())ws++}));
+  if(ws){I.push(['med',ws+' cells with stray spaces','"Pune " and "Pune" count as different values']);pen+=Math.min(10,ws/(n*cols)*60)}
+  let mk=0;D.forEach(r=>r.forEach(v=>{if(isMiss(v)&&v.trim()!=='')mk++}));
+  if(mk){I.push(['med',mk+' cells use fake blanks','Values like N/A, null, - or -- instead of empty']);pen+=Math.min(8,mk/(n*cols)*60)}
+  const mixed=[];
+  H.forEach((h,j)=>{const v=D.map(r=>r[j]).filter(x=>!isMiss(x));if(!v.length)return;const s=v.filter(isNum).length/v.length;if(s>.1&&s<.9)mixed.push(h)});
+  if(mixed.length){I.push(['high','Mixed numbers and text','In: '+mixed.join(', ')+'. Needs a manual look, no auto-fix.']);pen+=Math.min(20,mixed.length*8)}
+  const vg=varGroups();
+  if(vg.length){I.push(['med',vg.length+' spelling variants of the same value','e.g. '+vg.slice(0,2).map(g=>'"'+Object.keys(g.m).join('" / "')+'"').join(', ')]);pen+=Math.min(18,vg.length*5)}
+  return{I,score:Math.max(0,Math.round(100-pen)),n,cols,ws,mk,dup,vg:vg.length};
+}
+function render(){
+  const a=analyze();if(start===null)start=a.score;
+  const c=a.score>=80?'var(--teal)':a.score>=50?'var(--amber)':'var(--red)';
+  $('sc').textContent=a.score;$('sc').style.color=c;
+  $('bar').style.width=a.score+'%';$('bar').style.background=c;
+  $('verdict').textContent=a.score>=80?'Ready to build on':a.score>=50?'Fix a few things first':'Not safe to build on yet';
+  $('meta').textContent=a.n+' rows, '+a.cols+' columns';
+  $('hist').textContent=a.score!==start?'Score: '+start+' → '+a.score:'';
+  $('issues').innerHTML='';
+  if(!a.I.length){const d=document.createElement('div');d.className='issue';d.innerHTML='<span class="chip ok">ok</span><div><b>No problems found</b></div>';$('issues').appendChild(d)}
+  a.I.forEach(i=>{const d=document.createElement('div');d.className='issue';
+    const ch=document.createElement('span');ch.className='chip '+i[0];ch.textContent=i[0];
+    const w=document.createElement('div');const b=document.createElement('b');b.textContent=i[1];const s=document.createElement('small');s.textContent=i[2];
+    w.append(b,s);d.append(ch,w);$('issues').appendChild(d)});
+  const set=(id,t,n)=>{$(id).textContent=t+(n?' ('+n+')':'');$(id).disabled=!n};
+  set('f-trim','Trim spaces',a.ws);set('f-miss','Unify blanks',a.mk);set('f-var','Merge spellings',a.vg);set('f-dup','Remove duplicates',a.dup);
+  $('f-all').disabled=!(a.ws||a.mk||a.vg||a.dup);
+  const t=document.createElement('table');
+  const hr=t.insertRow();H.forEach(h=>{const th=document.createElement('th');th.textContent=h;hr.appendChild(th)});
+  D.slice(0,6).forEach(r=>{const tr=t.insertRow();r.forEach(v=>{tr.insertCell().textContent=v})});
+  $('prev').innerHTML='';$('prev').appendChild(t);
+  $('csvOut').hidden=true;$('dlmsg').textContent='';
+}
+const fixes={
+  trim(){H=H.map(h=>h.trim());D=D.map(r=>r.map(v=>v.trim()))},
+  miss(){D=D.map(r=>r.map(v=>isMiss(v)?'':v))},
+  var(){
+    const rep={};
+    varGroups().forEach(({j,m})=>{const best=Object.keys(m).sort((x,y)=>m[y]-m[x])[0];Object.keys(m).forEach(k=>{rep[j+'|'+k]=best})});
+    D.forEach(r=>r.forEach((v,j)=>{const k=j+'|'+v.trim();if(rep[k])r[j]=rep[k]}));
+  },
+  dup(){const s=new Set();D=D.filter(r=>{const k=JSON.stringify(r.map(v=>v.trim()));if(s.has(k))return false;s.add(k);return true})}
+};
+document.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>{
+  const f=b.dataset.fix;
+  if(f==='all'){['trim','miss','var','dup'].forEach(k=>fixes[k]())}else fixes[f]();
+  render();
+});
+function csv(){return Papa.unparse([H,...D])}
+$('pick').onclick=()=>$('file').click();
+$('file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>load(String(r.result));r.onerror=()=>{$('err').textContent='Could not read that file.'};r.readAsText(f)};
+$('sample').onclick=()=>{$('paste').value=SAMPLE;load(SAMPLE)};
+$('check').onclick=()=>load($('paste').value);
+$('reset').onclick=()=>{$('out').hidden=true;$('paste').value='';window.scrollTo({top:0,behavior:'smooth'})};
+$('dl').onclick=async()=>{
+  const data=csv();let d=null;
+  try{d=await claude.use('downloads')}catch(e){}
+  if(d){
+    try{await d.save({filename:'cleaned_data.csv',data});return}
+    catch(e){if(e&&e.code==='declined')return}
+  }
+  $('csvOut').value=data;$('csvOut').hidden=false;$('csvOut').select();
+  $('dlmsg').textContent='Download is not available here. Select all and copy the cleaned CSV above.';
+};
+</script>
+</body>
+</html>
